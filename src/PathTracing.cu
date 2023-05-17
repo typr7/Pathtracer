@@ -150,7 +150,7 @@ extern "C" __global__ void __raygen__pinhole()
             result += payload.emission;
             result += payload.radiance;
             payload.depth++;
-        } while (!payload.done && payload.depth < max_tracing_num);
+        } while (g_launch_params.enable_gl && !payload.done && payload.depth < max_tracing_num);
     }
 
     float3 result_color = result / static_cast<float>(samples_per_pixel);

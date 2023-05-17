@@ -49,6 +49,9 @@ struct TracerState
     Camera camera = {};
 
     bool camera_changed = true;
+
+    // global illumination
+    bool gl_switched    = false;
 };
 
 class Tracer

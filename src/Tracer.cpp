@@ -156,9 +156,8 @@ void keyCallback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t acti
             state->camera.move(make_float3(0.0f, -1.0f, 0.0f));
             break;
         case GLFW_KEY_P:
-            auto pos = state->camera.getPosition();
-            std::cout << std::format("({}, {}, {})\n", pos.x, pos.y, pos.z);
-            break;
+            state->gl_switched = true;
+            return;
         }
         state->camera_changed = true;
     }
@@ -178,6 +177,7 @@ Tracer::Tracer(int32_t output_width, int32_t output_height)
             .emission = make_float3(100.0f, 100.0f, 50.0f)
             // .emission = make_float3(30.0f)
         },
+        .enable_gl         = false,
         .p_rr              = 0.7f,
         .samples_per_pixel = 16,
         .max_tracing_num   = 3,
@@ -743,6 +743,12 @@ void Tracer::updateState()
         */
 
         m_state.camera_changed = false;
+    }
+
+    if (m_state.gl_switched) {
+        m_state.launch_params.enable_gl         = !m_state.launch_params.enable_gl;
+        m_state.launch_params.frame.accum_count = 0;
+        m_state.gl_switched = false;
     }
 }
 

@@ -28,6 +28,7 @@ struct LaunchParams
     // CudaBufferView<ParallelogramLight> lights;
     ParallelogramLight light;
 
+    bool     enable_gl;
     float    p_rr;
     uint32_t samples_per_pixel;
     uint32_t max_tracing_num;
