@@ -128,15 +128,15 @@ extern "C" __global__ void __raygen__pinhole()
     const uint32_t max_tracing_num   = g_launch_params.max_tracing_num;
     const auto     camera            = g_launch_params.camera;
 
-    uint32_t seed = tea<4>(pixel_index, accum_count);
-    float3 result = make_float3(0.0f);
+    uint32_t seed = tea<4>(pixel_index, accum_count); // 生成随机数种子
+    float3 result = make_float3(0.0f); // 累积颜色
 
     for (uint32_t i = 0; i < samples_per_pixel; i++) {
-        const float2 subpixel_jitter = make_float2(rnd(seed), rnd(seed));
+        const float2 subpixel_jitter = make_float2(rnd(seed), rnd(seed)); // 追踪方向的随机偏移量
         const float2 st = 2.0f
                           * make_float2((static_cast<float>(idx.x) + subpixel_jitter.x) / static_cast<float>(dim.x),
                                         (static_cast<float>(idx.y) + subpixel_jitter.y) / static_cast<float>(dim.y))
-                          - 1.0f;
+                          - 1.0f; // 追踪方向的st坐标
         RadiancePayload payload = {};
         payload.seed          = seed;
         payload.attenuation   = make_float3(1.0f);
@@ -146,14 +146,14 @@ extern "C" __global__ void __raygen__pinhole()
         payload.depth         = 0;
 
         do {
-            traceRadiance(g_launch_params.handle, 0.001f, 1e15f, payload);
-            result += payload.emission;
-            result += payload.radiance;
+            traceRadiance(g_launch_params.handle, 0.001f, 1e15f, payload); // 开始一次追踪
+            result += payload.emission; // 累加一次追踪得到的颜色
+            result += payload.radiance; // 累加一次追踪得到的颜色
             payload.depth++;
         } while (g_launch_params.enable_gl && !payload.done && payload.depth < max_tracing_num);
     }
 
-    float3 result_color = result / static_cast<float>(samples_per_pixel);
+    float3 result_color = result / static_cast<float>(samples_per_pixel); // 将累积颜色求均值，得到最终颜色
     float3 accum_color  = make_float3(g_launch_params.frame.accum_buffer[pixel_index]);
     
     if (accum_count > 0) {
@@ -164,6 +164,142 @@ extern "C" __global__ void __raygen__pinhole()
     g_launch_params.frame.accum_buffer[pixel_index] = make_float4(result_color, 1.0f);
     g_launch_params.frame.color_buffer[pixel_index] = make_color(result_color);
 }
+
+/*
+extern "C" __global__ void __raygen__pinhole()
+{
+    const uint3    idx               = optixGetLaunchIndex();
+    const uint3    dim               = optixGetLaunchDimensions();
+    const size_t   pixel_index       = dim.x * idx.y + idx.x;
+    const uint32_t accum_count       = g_launch_params.frame.accum_count;
+    const uint32_t samples_per_pixel = g_launch_params.samples_per_pixel;
+    const uint32_t max_tracing_num   = g_launch_params.max_tracing_num;
+    const auto     camera            = g_launch_params.camera;
+
+    uint32_t seed = tea<4>(pixel_index, accum_count);
+    const float2 subpixel_jitter = make_float2(rnd(seed), rnd(seed)); // 追踪方向的随机偏移量
+    const float2 st = 2.0f
+                      * make_float2((static_cast<float>(idx.x) + subpixel_jitter.x) / static_cast<float>(dim.x),
+                                    (static_cast<float>(idx.y) + subpixel_jitter.y) / static_cast<float>(dim.y))
+                      - 1.0f;
+
+    float3 result = make_float3(0.0f);
+    uint32_t u0, u1;
+    packPointer(u0, u1, &result);
+
+    const float3 origin        = camera.position;
+    const float3 ray_direction = normalize(st.x * camera.u + st.y * camera.v - camera.w);
+
+    optixTrace(g_mapper.payloadType(PAYLOAD_TYPE_RADIANCE),
+               g_launch_params.handle,
+               origin,
+               ray_direction,
+               0.001f,
+               1e16f,
+               0.0f,  // ray time
+               OptixVisibilityMask{ 255 },    // visibility mask
+               OPTIX_RAY_FLAG_DISABLE_ANYHIT | OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+               // OPTIX_RAY_FLAG_NONE,
+               RAY_TYPE_RADIANCE,
+               RAY_TYPE_COUNT,
+               RAY_TYPE_RADIANCE,
+               u0, u1);
+    
+    float4& accum_color  = g_launch_params.frame.accum_buffer[pixel_index];
+    uchar4& result_color = g_launch_params.frame.color_buffer[pixel_index];
+
+    accum_color += make_float4(result, 1.0f);
+    if (accum_count == 0)
+        accum_color = make_float4(result, 1.0f);
+    
+    const float4 color = accum_color / static_cast<float>(accum_count + 1);
+    result_color = make_uchar4(static_cast<uint8_t>(255.99f * color.x),
+                               static_cast<uint8_t>(255.99f * color.y),
+                               static_cast<uint8_t>(255.99f * color.z),
+                               255);
+}
+
+extern "C" __global__ void __closesthit__radiance()
+{
+    optixSetPayloadTypes(PAYLOAD_TYPE_RADIANCE);
+
+    const HitgroupData*       data     = reinterpret_cast<HitgroupData*>(optixGetSbtDataPointer());
+    const HitResult           result   = getHitResult(*data);
+    const PbrMaterial&        material = *(data->material);
+    const ParallelogramLight& light    = g_launch_params.light;
+    const float3              ray_direction = optixGetWorldRayDirection();
+
+    float3& color = getPayload<float3&>();
+
+    float4 base_color = material.base_color * result.color;
+    if (material.base_color_texture) {
+        const float4 texture_color        = sampleTexture<float4>(material.base_color_texture, result);
+        const float3 texture_color_linear = gammaCorrect(make_float3(texture_color), 2.2f); // texture color is stored in sRGB colorspace, add a gamma correction(gamma = 2.2) to it .
+        base_color *= make_float4(texture_color_linear, texture_color.w);
+    }
+
+    const float3 emissive_factor = material.emissive_factor;
+    float3       emissive_color  = make_float3(1.0f);
+    if (material.emissive_texture)
+        emissive_color = make_float3(sampleTexture<float4>(material.emissive_texture, result));
+    emissive_color = emissive_factor * emissive_color;
+
+    // normal
+    float3 normal = result.normal;
+    if (material.normal_texture) {
+        const float4 normal_sampled = 2.0f * sampleTexture<float4>(material.normal_texture, result) - make_float4(1.0f);
+        const float2 rotation       = material.normal_texture.texcoord_rotation;
+        const float2 tb             = make_float2(normal_sampled.x, normal_sampled.y);
+        const float2 tb_trans       = make_float2(dot(tb, make_float2(rotation.y, -rotation.x)),
+                                                  dot(tb, make_float2(rotation.x, rotation.y)));
+        normal = normalize(tb_trans.x * result.texcoord.t + tb_trans.y * result.texcoord.b + normal_sampled.z * result.normal);
+    }
+
+    if (dot(normal, ray_direction) > 0.0f)
+        normal = -normal;
+    
+    float metallic  = material.metallic;
+    float roughness = material.roughness;
+    if (material.metallic_roughness_texture) {
+        const float4 metallic_roughness = sampleTexture<float4>(material.metallic_roughness_texture, result);
+        metallic  *= metallic_roughness.z;
+        roughness *= metallic_roughness.y;
+    }
+
+    const float3 albedo = make_float3(base_color);
+    const float3 F0     = lerp(make_float3(0.04f), albedo, metallic);
+    
+    const float3 light_sample_pos = light.center;
+    const float3 light_sample_dir = normalize(light_sample_pos - result.intersection);
+    const float  distance         = length(light_sample_pos - result.intersection);
+    const float3 half_vec   = normalize(light_sample_dir - ray_direction);
+    const float  N_dot_L    = dot(normal, light_sample_dir);
+    const float  V_dot_H    = dot(-ray_direction, half_vec);
+    const float  LN_dot_IL  = dot(light.normal, -light_sample_dir);
+    
+    const float3 F      = schlick(F0, V_dot_H);
+    const float3 ks     = F;
+    const float3 kd     = (make_float3(1.0f) - ks) * (1.0f - metallic);
+
+    float3 diffuse = make_float3(0.0f);
+    float3 specular = make_float3(0.0f);
+    if (N_dot_L > 0.0f && LN_dot_IL > 0.0f && distance > 0.00001f) {
+        const bool  occluded = traceOcclusion(g_launch_params.handle,
+                                            result.intersection,
+                                            light_sample_dir,
+                                            0.001f,
+                                            distance - 0.001f);
+        if (!occluded) {
+            diffuse = albedo * (light.emission / (distance * distance)) * fmaxf(0.0f, dot(normal, light_sample_dir));
+            specular = 0.1f * (light.emission / (distance * distance)) * fmaxf(0.0f, powf(dot(normal, half_vec), 20));
+        }
+    }
+
+    color = make_float3(0.1f) + diffuse + specular + emissive_color;
+    // color = make_float3(0.1f) + albedo;
+    color = clamp(color, 0.0f, 1.0f);
+}
+*/
 
 extern "C" __global__ void __closesthit__radiance()
 {
@@ -261,11 +397,11 @@ extern "C" __global__ void __closesthit__radiance()
 
     // uniform hemisphere sample
     {
-        float3 hemisphere_sample_dir;
-        cosine_sample_hemisphere(rnd(seed), rnd(seed), hemisphere_sample_dir);
+        float3 hemisphere_sample_dir; // 半球随机采样方向
+        cosine_sample_hemisphere(rnd(seed), rnd(seed), hemisphere_sample_dir); // 生成半球随机采样方向
         Onb onb(normal);
-        onb.inverse_transform(hemisphere_sample_dir);
-        hemisphere_sample_dir = normalize(hemisphere_sample_dir);
+        onb.inverse_transform(hemisphere_sample_dir); // 将半球随机采样方向向量变换到平面法线空间
+        hemisphere_sample_dir = normalize(hemisphere_sample_dir); // 归一化
 
         const float3 half_vec = normalize(hemisphere_sample_dir - payload.ray_direction);
         const float  N_dot_L  = dot(normal, hemisphere_sample_dir);
@@ -300,14 +436,23 @@ extern "C" __global__ void __miss__radiance()
     RadiancePayload& payload = getRadiancePayload();
 
     payload.radiance = make_float3(0.0f); // if depth > 0 and ray missed, then no radiance
-    /*
     if (payload.depth == 0) // directly hit the background
         payload.radiance = g_launch_params.background_color;
-    */
 
     payload.emission = make_float3(0.0f);
     payload.done = true;
 }
+
+/*
+extern "C" __global__ void __miss__radiance()
+{
+    optixSetPayloadTypes(PAYLOAD_TYPE_RADIANCE);
+    float3& color = getPayload<float3&>();
+
+    color = make_float3(0.0f);
+}
+*/
+
 
 extern "C" __global__ void __closesthit__occlusion()
 {

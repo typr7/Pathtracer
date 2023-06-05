@@ -175,6 +175,7 @@ Tracer::Tracer(int32_t output_width, int32_t output_height)
     m_state.launch_params = LaunchParams{
         .light             = ParallelogramLight{
             .emission = make_float3(100.0f, 100.0f, 50.0f)
+            // .emission = make_float3(1.5f, 1.5f, 1.0f)
             // .emission = make_float3(30.0f)
         },
         .enable_gl         = false,
