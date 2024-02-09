@@ -6,6 +6,8 @@
 
 #include "VectorMath.h"
 
+#define CAMERA_FACTOR 0.01f
+
 class Camera
 {
 public:
@@ -20,14 +22,14 @@ public:
     void setUp(const float3& up) { m_up = normalize(up); m_uvw_changed = true; }
     void setFov(float vfov) { m_vfov = vfov; m_uvw_changed = true; }
     void setAspectRatio(float aspect_ratio) { m_aspect_ratio = aspect_ratio; m_uvw_changed = true; }
-    void setWorldScale(float world_scale) { m_move_speed = 0.1f * world_scale; }
+    void setWorldScale(float world_scale) { m_move_speed = CAMERA_FACTOR * world_scale; }
 
     float3 getPosition() const noexcept { return m_position; }
     float3 getTarget() const noexcept { return m_target; }
     float3 getUp() const noexcept { return m_up; }
     float getFov() const noexcept { return m_vfov; }
     float getAspectRatio() const noexcept { return m_aspect_ratio; }
-    float getWorldScale() const noexcept { return 10.0f * m_move_speed; }
+    float getWorldScale() const noexcept { return m_move_speed / CAMERA_FACTOR; }
     void getUVW(float3& u, float3& v, float3& w) const noexcept { u = m_ulen * m_u, v = m_vlen * m_v, w = m_wlen * m_w; }
 
     void zoom(int zoom_length);

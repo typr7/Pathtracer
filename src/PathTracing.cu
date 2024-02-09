@@ -128,15 +128,15 @@ extern "C" __global__ void __raygen__pinhole()
     const uint32_t max_tracing_num   = g_launch_params.max_tracing_num;
     const auto     camera            = g_launch_params.camera;
 
-    uint32_t seed = tea<4>(pixel_index, accum_count); // 生成随机数种子
-    float3 result = make_float3(0.0f); // 累积颜色
+    uint32_t seed = tea<4>(pixel_index, accum_count);
+    float3 result = make_float3(0.0f);
 
     for (uint32_t i = 0; i < samples_per_pixel; i++) {
-        const float2 subpixel_jitter = make_float2(rnd(seed), rnd(seed)); // 追踪方向的随机偏移量
+        const float2 subpixel_jitter = make_float2(rnd(seed), rnd(seed));
         const float2 st = 2.0f
                           * make_float2((static_cast<float>(idx.x) + subpixel_jitter.x) / static_cast<float>(dim.x),
                                         (static_cast<float>(idx.y) + subpixel_jitter.y) / static_cast<float>(dim.y))
-                          - 1.0f; // 追踪方向的st坐标
+                          - 1.0f;
         RadiancePayload payload = {};
         payload.seed          = seed;
         payload.attenuation   = make_float3(1.0f);
@@ -146,14 +146,14 @@ extern "C" __global__ void __raygen__pinhole()
         payload.depth         = 0;
 
         do {
-            traceRadiance(g_launch_params.handle, 0.001f, 1e15f, payload); // 开始一次追踪
-            result += payload.emission; // 累加一次追踪得到的颜色
-            result += payload.radiance; // 累加一次追踪得到的颜色
+            traceRadiance(g_launch_params.handle, 0.001f, 1e15f, payload);
+            result += payload.emission;
+            result += payload.radiance;
             payload.depth++;
         } while (g_launch_params.enable_gl && !payload.done && payload.depth < max_tracing_num);
     }
 
-    float3 result_color = result / static_cast<float>(samples_per_pixel); // 将累积颜色求均值，得到最终颜色
+    float3 result_color = result / static_cast<float>(samples_per_pixel);
     float3 accum_color  = make_float3(g_launch_params.frame.accum_buffer[pixel_index]);
     
     if (accum_count > 0) {
@@ -368,7 +368,7 @@ extern "C" __global__ void __closesthit__radiance()
         const float  N_dot_L    = dot(normal, light_sample_dir);
         const float  N_dot_V    = dot(normal, -payload.ray_direction);
         const float  N_dot_H    = dot(normal, half_vec);
-        const float  V_dot_H    = dot(-payload.ray_direction, half_vec);
+        const float  V_dot_H    = min(1.0f, dot(-payload.ray_direction, half_vec));
         const float  LN_dot_IL  = dot(light.normal, -light_sample_dir);
         
         const float3 F      = schlick(F0, V_dot_H);
@@ -407,7 +407,7 @@ extern "C" __global__ void __closesthit__radiance()
         const float  N_dot_L  = dot(normal, hemisphere_sample_dir);
         const float  N_dot_V  = dot(normal, -payload.ray_direction);
         const float  N_dot_H  = dot(normal, half_vec);
-        const float  V_dot_H  = dot(-payload.ray_direction, half_vec);
+        const float  V_dot_H  = min(1.0f, dot(-payload.ray_direction, half_vec));
 
         const float3 F      = schlick(F0, V_dot_H);
         const float  D      = ggxNormal(N_dot_H, alpha);

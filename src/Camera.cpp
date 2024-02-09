@@ -1,7 +1,5 @@
 #include "Camera.h"
 
-#include <iostream>
-#include <format>
 
 #include "Transform.h"
 
@@ -17,7 +15,7 @@ Camera::Camera(const float3& position, const float3& target, const float3& up, f
     , m_up{ normalize(up) }
     , m_vfov{ vfov }
     , m_aspect_ratio{ aspect_ratio }
-    , m_move_speed{ 0.1f * world_scale }
+    , m_move_speed{ CAMERA_FACTOR * world_scale }
 {
     computeUVW();
 }

@@ -7,9 +7,9 @@ This is a pathtracer that written by C++20, it uses NVIDIA's OptiX as its graphi
 - Simple Arcball Camera
 - Maybe More
 # Todo
-- [ ] Fix the bug that causes black dots on the output image
+- [x] Fix the bug that causes black dots on the output image
 - [ ] Add support for glass material 
-# Picture (flawed)
+# Picture
 ![Cornell Box](picture/cornellbox.png)
 ![Sponza](picture/sponza.png)
 # Reference

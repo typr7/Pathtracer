@@ -12,7 +12,7 @@ struct LaunchParams
 {
     struct
     {
-        uint32_t accum_count;
+        uint32_t               accum_count;
         CudaBufferView<float4> accum_buffer;
         CudaBufferView<uchar4> color_buffer;
     } frame;

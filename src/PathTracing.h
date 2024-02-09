@@ -42,5 +42,7 @@ static constexpr uint32_t radiance_payload_semantics[2] = {
 };
 
 static constexpr uint32_t occlusion_payload_semantics[1] = {
-    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE | OPTIX_PAYLOAD_SEMANTICS_MS_WRITE
+    OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ
+    | OPTIX_PAYLOAD_SEMANTICS_CH_WRITE
+    | OPTIX_PAYLOAD_SEMANTICS_MS_WRITE
 };

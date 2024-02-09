@@ -173,11 +173,6 @@ Tracer::Tracer(int32_t output_width, int32_t output_height)
     m_state.accum_buffer.resize(sizeof(float4) * output_width * output_height);
     m_state.color_buffer.resize(output_width, output_height);
     m_state.launch_params = LaunchParams{
-        .light             = ParallelogramLight{
-            .emission = make_float3(100.0f, 100.0f, 50.0f)
-            // .emission = make_float3(1.5f, 1.5f, 1.0f)
-            // .emission = make_float3(30.0f)
-        },
         .enable_gl         = false,
         .p_rr              = 0.7f,
         .samples_per_pixel = 16,
@@ -250,8 +245,22 @@ void Tracer::loadScene(std::shared_ptr<Scene> scene)
                                 / static_cast<float>(m_state.output_size.y),
                                 max_extent);
     }
+}
 
-    /*
+void Tracer::prepareCornellBox()
+{
+    ParallelogramLight& light = m_state.launch_params.light;
+    light.center = make_float3(0.0f, 1.9f, 0.0f);
+    light.half_u = make_float3(0.09f, 0.0f, 0.0f);
+    light.half_v = make_float3(0.0f, 0.0f, 0.09f);
+    light.normal = make_float3(0.0f, -1.0f , 0.0f);
+    light.emission = make_float3(100.0f, 100.0f, 50.0f);
+}
+
+void Tracer::prepareSponza()
+{
+    const float3& extent = m_scene->aabb.extent();
+    float max_extent = std::max({ extent.x, extent.y, extent.z });
     const float3 up = m_state.camera.getUp();
     const float3& center = m_scene->aabb.center();
     ParallelogramLight& light = m_state.launch_params.light;
@@ -259,13 +268,7 @@ void Tracer::loadScene(std::shared_ptr<Scene> scene)
     light.half_u = 1.5f * extent.x * make_float3(1.0f, 0.0f, 0.0f);
     light.half_v = 1.5f * extent.y * make_float3(0.0f, 0.0f, 1.0f);
     light.normal = -up;
-    */
-
-    ParallelogramLight& light = m_state.launch_params.light;
-    light.center = make_float3(0.0f, 1.9f, 0.0f);
-    light.half_u = make_float3(0.09f, 0.0f, 0.0f);
-    light.half_v = make_float3(0.0f, 0.0f, 0.09f);
-    light.normal = make_float3(0.0f, -1.0f , 0.0f);
+    light.emission = make_float3(40.0f);
 }
 
 void Tracer::start()

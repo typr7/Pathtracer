@@ -61,6 +61,9 @@ public:
     ~Tracer() noexcept;
 
     void loadScene(std::shared_ptr<Scene> scene);
+
+    void prepareCornellBox();
+    void prepareSponza();
     
     void start();
 
